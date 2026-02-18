@@ -19,4 +19,12 @@ Treat **AGENTS.md as the source of truth** for architecture, invariants, and val
 python -m unittest test_lsystem_generator.py
 python lsystem_generator.py validate <config.json>
 python lsystem_generator.py render <config.json> <output.svg>
+python lsystem_generator.py random <output.json> [--seed N]
 ```
+
+## Key constraints
+
+- **Python 3.11+**; stdlib only — no external dependencies.
+- Keep the 3 phases independent: Grammar expansion → Turtle → SVG (see AGENTS.md).
+- JSON config changes must be backward-compatible; see AGENTS.md for rules.
+- See `example/` for 20+ working configs to test against.
