@@ -1,0 +1,30 @@
+{
+  "name": "Koch curve",
+  "axiom": "F",
+  "iterations": 4,
+  "rules": {
+    "F": "F+F--F+F"
+  },
+  "turtle": {
+    "angle": 60,
+    "step": 10,
+    "start": {"x": 0, "y": 0, "heading": 0},
+    "commands": {
+      "F": {"type": "forward", "draw": true},
+      "+": {"type": "turn", "direction": 1},
+      "-": {"type": "turn", "direction": -1}
+    }
+  },
+  "svg": {
+    "margin": 10,
+    "precision": 3,
+    "flip_y": true,
+    "style": {
+      "stroke": "#000",
+      "stroke_width": 1,
+      "fill": "none",
+      "stroke_linecap": "round",
+      "stroke_linejoin": "round"
+    }
+  }
+}

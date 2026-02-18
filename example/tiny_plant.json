@@ -1,0 +1,22 @@
+{
+  "name": "Tiny plant",
+  "axiom": "X",
+  "iterations": 5,
+  "rules": {
+    "X": "F[+X]F[-X]+X",
+    "F": "FF"
+  },
+  "turtle": {
+    "angle": 25,
+    "step": 6,
+    "start": {"x": 0, "y": 0, "heading": 90},
+    "commands": {
+      "F": {"type": "forward", "draw": true},
+      "+": {"type": "turn", "direction": 1},
+      "-": {"type": "turn", "direction": -1},
+      "[": {"type": "push"},
+      "]": {"type": "pop"},
+      "X": {"type": "noop"}
+    }
+  }
+}

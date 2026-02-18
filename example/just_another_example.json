@@ -1,0 +1,45 @@
+{
+  "name": "Example 1",
+  "axiom": "R+R+R+R",
+  "iterations": 5,
+  "rules": {
+    "R": "R-R+R+R-R"
+  },
+  "turtle": {
+    "angle": 90,
+    "step": 0.00411522633744856,
+    "start": {
+      "x": 0,
+      "y": 0,
+      "heading": 0
+    },
+    "commands": {
+      "R": {
+        "type": "forward",
+        "draw": true
+      },
+      "+": {
+        "type": "turn",
+        "direction": 1,
+        "angle": 1
+      },
+      "-": {
+        "type": "turn",
+        "direction": -1,
+        "angle": 1
+      }
+    }
+  },
+  "svg": {
+    "margin": 0.02,
+    "precision": 6,
+    "flip_y": true,
+    "style": {
+      "stroke": "#000",
+      "stroke_width": 0.002,
+      "fill": "none",
+      "stroke_linecap": "round",
+      "stroke_linejoin": "round"
+    }
+  }
+}
