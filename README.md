@@ -35,6 +35,16 @@ This is a single-file script.
 
 ---
 
+## Testing
+
+To run the test suite:
+
+```bash
+python -m unittest test_lsystem_generator.py
+```
+
+---
+
 ## Quick start
 
 ### 1) Generate a random config

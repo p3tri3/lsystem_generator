@@ -9,6 +9,7 @@ Command-line application — Python 3.11+ — single-script implementation.
 
 Primary artifacts:
 - `lsystem_generator.py` (CLI + engine + SVG writer)
+- `test_lsystem_generator.py` (Unit tests)
 - JSON config files (inputs)
 - SVG files (outputs)
 - `README.md` (user-facing documentation)
@@ -33,6 +34,8 @@ The current implementation is delivered as a single Python script, `lsystem_gene
 - `render <config.json> <output.svg>`
 - `validate <config.json>`
 - `random <output.json> [--seed N]` (generates an experimental random config)
+
+There appears to be a test suite `test_lsystem_generator.py` using `unittest`.
 
 The engine supports:
 - Deterministic rewriting rules (`rules`: symbol -> replacement string)
@@ -168,6 +171,7 @@ When adding features, prefer:
 To confirm you are aligned with the project goal:
 
 1) Run:
+   - `python -m unittest test_lsystem_generator.py`
    - `python lsystem_generator.py validate example/koch.json`
    - `python lsystem_generator.py render example/koch.json out.svg`
 2) Open `out.svg` in a vector editor and confirm:

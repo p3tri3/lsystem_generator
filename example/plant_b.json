@@ -1,0 +1,55 @@
+{
+  "name": "Plant B (bushy)",
+  "axiom": "X",
+  "iterations": 7,
+  "rules": {
+    "X": "F[+X]F[-X]+X",
+    "F": "FF"
+  },
+  "turtle": {
+    "angle": 20,
+    "step": 1.0,
+    "start": {
+      "x": 0,
+      "y": 0,
+      "heading": 90
+    },
+    "commands": {
+      "F": {
+        "type": "forward",
+        "draw": true
+      },
+      "X": {
+        "type": "noop"
+      },
+      "+": {
+        "type": "turn",
+        "direction": 1,
+        "angle": 1
+      },
+      "-": {
+        "type": "turn",
+        "direction": -1,
+        "angle": 1
+      },
+      "[": {
+        "type": "push"
+      },
+      "]": {
+        "type": "pop"
+      }
+    }
+  },
+  "svg": {
+    "margin": 0.03,
+    "precision": 6,
+    "flip_y": true,
+    "style": {
+      "stroke": "#000",
+      "stroke_width": 0.15,
+      "fill": "none",
+      "stroke_linecap": "round",
+      "stroke_linejoin": "round"
+    }
+  }
+}

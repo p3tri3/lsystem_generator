@@ -1,0 +1,45 @@
+{
+  "name": "Koch Quadratic Curve (simple)",
+  "axiom": "F",
+  "iterations": 5,
+  "rules": {
+    "F": "F+F-F-F+F"
+  },
+  "turtle": {
+    "angle": 90,
+    "step": 1.0,
+    "start": {
+      "x": 0,
+      "y": 0,
+      "heading": 0
+    },
+    "commands": {
+      "F": {
+        "type": "forward",
+        "draw": true
+      },
+      "+": {
+        "type": "turn",
+        "direction": 1,
+        "angle": 1
+      },
+      "-": {
+        "type": "turn",
+        "direction": -1,
+        "angle": 1
+      }
+    }
+  },
+  "svg": {
+    "margin": 0.03,
+    "precision": 6,
+    "flip_y": true,
+    "style": {
+      "stroke": "#000",
+      "stroke_width": 0.2,
+      "fill": "none",
+      "stroke_linecap": "round",
+      "stroke_linejoin": "round"
+    }
+  }
+}
