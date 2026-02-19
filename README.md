@@ -87,7 +87,10 @@ Optional flags:
 python lsystem_generator.py validate CONFIG.json
 ```
 
-Checks the JSON structure and prints a short summary.
+Parses and validates the JSON structure, then runs a bounded expansion
+(up to 10 000 symbols) through the full turtle interpreter.  Reports symbol
+count, polyline count, and a warning if the expansion was truncated.  Raises
+an error if the config produces no drawable geometry.
 
 ### `random`
 
@@ -239,7 +242,9 @@ Useful for non-drawing control symbols.
 ## SVG output settings
 
 ### `svg.margin` (default 10)
-Extra margin added around the computed bounds.
+Extra margin added around the computed bounds.  Must be `> 0` if the geometry
+is collinear (e.g. a single horizontal or vertical line), otherwise the
+viewBox would have zero height or width and rendering will fail.
 
 ### `svg.precision` (default 3)
 Number of decimal places used in coordinate formatting.

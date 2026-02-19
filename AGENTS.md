@@ -80,6 +80,7 @@ Action types used:
 - Turtle interpretation is independent of SVG formatting.
 - SVG output uses **vector primitives** suitable for editing (polylines by default).
 - `render` should not silently “fix” configs; validation should be explicit (`validate`).
+- `validate` runs a bounded expansion (≤ 10 000 symbols via `itertools.islice`) through the full turtle interpreter and raises `ConfigError` if the config produces no drawable geometry.
 
 ## Non-goals
 
@@ -88,8 +89,8 @@ Action types used:
 
 ## Failure modes / pitfalls
 
-- **Exponential growth:** random grammars can explode. If adding new generators/features, consider optional safety limits:
-  - max expanded symbols
+- **Exponential growth:** random grammars can explode. `validate` samples at most 10 000 symbols to give a fast preview.
+  If adding new generators/features, consider additional safety limits:
   - max drawn segments
   - max stack depth
 - **SVG coordinate system:** SVG Y axis is downward; if transforms change, keep output orientation consistent.

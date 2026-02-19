@@ -28,3 +28,4 @@ python lsystem_generator.py random <output.json> [--seed N]
 - Keep the 3 phases independent: Grammar expansion → Turtle → SVG (see AGENTS.md).
 - JSON config changes must be backward-compatible; see AGENTS.md for rules.
 - See `example/` for 20+ working configs to test against.
+- `validate` runs a bounded geometry pass (≤ 10 000 symbols); keep that limit in `_VALIDATE_SYMBOL_LIMIT`.
