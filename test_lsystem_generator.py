@@ -13,7 +13,10 @@ from lsystem_generator import (
     TurtleState,
     SvgStyle,
     write_svg,
+    compute_bounds,
+    load_json,
     generate_random_config,
+    main,
 )
 
 
@@ -58,6 +61,14 @@ class TestConfigParsing(unittest.TestCase):
         with self.assertRaises(ConfigError):
             parse_config({"axiom": "F", "iterations": "1", "turtle": {}, "svg": {}})
 
+    def test_multichar_rule_key(self):
+        with self.assertRaises(ConfigError):
+            parse_config({"axiom": "F", "rules": {"FF": "F"}, "turtle": {}, "svg": {}})
+
+    def test_precision_out_of_range(self):
+        with self.assertRaises(ConfigError):
+            parse_config({"axiom": "F", "turtle": {}, "svg": {"precision": 15}})
+
 
 class TestExpansion(unittest.TestCase):
     def test_simple_expansion(self):
@@ -87,6 +98,11 @@ class TestExpansion(unittest.TestCase):
         axiom = "F+-F"
         gen = list(stream_expand(axiom, rules, 5))
         self.assertEqual("".join(gen), "F+-F")
+
+    def test_zero_iterations_with_rules(self):
+        # At iterations=0 the axiom must pass through unchanged even when rules exist
+        rules = {"F": "F+F", "X": "FF"}
+        self.assertEqual("".join(stream_expand("FX", rules, 0)), "FX")
 
 
 class TestTurtle(unittest.TestCase):
@@ -187,6 +203,63 @@ class TestTurtle(unittest.TestCase):
         # ny = y + dist * sin(rad)
         # so h=90 -> cos=0, sin=1 -> +y. Correct.
 
+    def test_turn_abs(self):
+        # turn_abs sets heading by adding an absolute angle delta
+        commands = {
+            "A": {"type": "turn_abs", "angle": 90},
+            "F": {"type": "forward", "draw": True},
+        }
+        polylines = interpret_to_polylines(
+            "AF",
+            commands=commands,
+            angle_deg=45,
+            step=10,
+            start=self.start,
+        )
+        # heading starts at 0; turn_abs adds 90 → heading = 90
+        # forward: (0 + 10*cos(90°), 0 + 10*sin(90°)) ≈ (0, 10)
+        self.assertEqual(len(polylines), 1)
+        self.assertAlmostEqual(polylines[0][1][0], 0, places=9)
+        self.assertAlmostEqual(polylines[0][1][1], 10, places=9)
+
+    def test_forward_move_starts_new_polyline(self):
+        # Pen-up (draw=False) moves without drawing and starts a new polyline.
+        # "FfF": draw→(10,0), move→(20,0), draw→(30,0) gives 2 polylines.
+        polylines = interpret_to_polylines(
+            "FfF",
+            commands=self.commands,
+            angle_deg=self.angle,
+            step=self.step,
+            start=self.start,
+            default_action="noop",
+        )
+        self.assertEqual(len(polylines), 2)
+        self.assertAlmostEqual(polylines[0][0][0], 0)
+        self.assertAlmostEqual(polylines[0][-1][0], 10)
+        self.assertAlmostEqual(polylines[1][0][0], 20)
+        self.assertAlmostEqual(polylines[1][-1][0], 30)
+
+    def test_pop_empty_stack(self):
+        with self.assertRaises(ConfigError):
+            interpret_to_polylines(
+                "]",
+                commands=self.commands,
+                angle_deg=self.angle,
+                step=self.step,
+                start=self.start,
+            )
+
+    def test_invalid_default_action(self):
+        with self.assertRaises(ConfigError):
+            interpret_to_polylines(
+                "F",
+                commands=self.commands,
+                angle_deg=self.angle,
+                step=self.step,
+                start=self.start,
+                default_action="typo",  # type: ignore[arg-type]
+            )
+
     def test_unknown_command_default(self):
         # 'X' is unknown. Default action is forward_draw
         polylines = interpret_to_polylines(
@@ -201,7 +274,47 @@ class TestTurtle(unittest.TestCase):
         self.assertAlmostEqual(polylines[0][1][0], 10)
 
 
+class TestComputeBounds(unittest.TestCase):
+    def test_basic_bounds(self):
+        polylines = [[(0.0, 5.0), (10.0, -2.0)], [(3.0, 8.0), (7.0, 1.0)]]
+        min_x, min_y, max_x, max_y = compute_bounds(polylines)
+        self.assertAlmostEqual(min_x, 0.0)
+        self.assertAlmostEqual(min_y, -2.0)
+        self.assertAlmostEqual(max_x, 10.0)
+        self.assertAlmostEqual(max_y, 8.0)
+
+    def test_collinear_horizontal(self):
+        # All points on the same horizontal line: height (y-span) is zero
+        polylines = [[(0.0, 0.0), (5.0, 0.0), (10.0, 0.0)]]
+        min_x, min_y, max_x, max_y = compute_bounds(polylines)
+        self.assertAlmostEqual(min_y, 0.0)
+        self.assertAlmostEqual(max_y, 0.0)
+        self.assertAlmostEqual(max_x - min_x, 10.0)
+
+    def test_empty_polylines_raises(self):
+        with self.assertRaises(ConfigError):
+            compute_bounds([])
+
+
 class TestEndToEnd(unittest.TestCase):
+    def _render(self, polylines, **kwargs):
+        """Helper: write SVG to a temp file and return its content."""
+        defaults = dict(
+            margin=5,
+            precision=2,
+            flip_y=False,
+            width=None,
+            height=None,
+            style=SvgStyle(),
+            background=None,
+        )
+        defaults.update(kwargs)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_path = os.path.join(tmpdir, "out.svg")
+            write_svg(polylines, out_path=out_path, **defaults)
+            with open(out_path) as f:
+                return f.read()
+
     def test_write_svg(self):
         polylines = [[(0, 0), (10, 10)]]
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -227,6 +340,26 @@ class TestEndToEnd(unittest.TestCase):
                 # So 10.00 -> 10.
                 self.assertIn('points="0,0 10,10"', content)
 
+    def test_write_svg_flip_y(self):
+        content = self._render([[(0, 0), (10, 5)]], flip_y=True)
+        self.assertIn('transform="translate(', content)
+        self.assertIn("scale(1,-1)", content)
+
+    def test_write_svg_background(self):
+        content = self._render([[(0, 0), (10, 5)]], background="#ff0000")
+        self.assertIn("<rect", content)
+        self.assertIn('fill="#ff0000"', content)
+
+    def test_write_svg_width_height(self):
+        content = self._render([[(0, 0), (10, 5)]], width=200.0, height=100.0)
+        self.assertIn('width="200"', content)
+        self.assertIn('height="100"', content)
+
+    def test_write_svg_title(self):
+        content = self._render([[(0, 0), (10, 5)]], title="My <L-System>")
+        self.assertIn("<title>", content)
+        self.assertIn("My &lt;L-System&gt;", content)
+
     def test_random_generator(self):
         cfg = generate_random_config(seed=42)
         # Basic check that it produced a valid-looking dictionary
@@ -238,6 +371,101 @@ class TestEndToEnd(unittest.TestCase):
         # Determinism check
         cfg2 = generate_random_config(seed=42)
         self.assertEqual(cfg, cfg2)
+
+
+class TestLoadJson(unittest.TestCase):
+    def test_malformed_json(self):
+        with tempfile.NamedTemporaryFile(
+            suffix=".json", mode="w", delete=False
+        ) as tmp:
+            tmp.write("{ not valid json }")
+            tmp_path = tmp.name
+        try:
+            with self.assertRaises(ConfigError):
+                load_json(tmp_path)
+        finally:
+            os.unlink(tmp_path)
+
+
+_EXAMPLE_DIR = os.path.join(os.path.dirname(__file__), "example")
+
+
+class TestCLI(unittest.TestCase):
+    def test_validate_command(self):
+        koch = os.path.join(_EXAMPLE_DIR, "koch.json")
+        self.assertEqual(main(["validate", koch]), 0)
+
+    def test_render_command(self):
+        koch = os.path.join(_EXAMPLE_DIR, "koch.json")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = os.path.join(tmpdir, "out.svg")
+            self.assertEqual(main(["render", koch, out]), 0)
+            self.assertTrue(os.path.exists(out))
+
+    def test_file_not_found_returns_error_code(self):
+        self.assertEqual(main(["render", "nonexistent_config.json", "out.svg"]), 2)
+
+    def test_invalid_config_returns_error_code(self):
+        with tempfile.NamedTemporaryFile(
+            suffix=".json", mode="w", delete=False
+        ) as tmp:
+            json.dump({"axiom": "F", "iterations": "bad", "turtle": {}, "svg": {}}, tmp)
+            tmp_path = tmp.name
+        try:
+            self.assertEqual(main(["validate", tmp_path]), 2)
+        finally:
+            os.unlink(tmp_path)
+
+
+class TestExampleConfigs(unittest.TestCase):
+    """Regression tests: every example config must render without error."""
+
+    def _render_example(self, filename: str) -> str:
+        """Parse, expand, interpret, and write SVG; return SVG content."""
+        from lsystem_generator import stream_expand, interpret_to_polylines
+
+        path = os.path.join(_EXAMPLE_DIR, filename)
+        cfg = parse_config(load_json(path))
+        symbols = stream_expand(cfg.axiom, cfg.rules, cfg.iterations)
+        polylines = interpret_to_polylines(
+            symbols,
+            commands=cfg.commands,
+            angle_deg=cfg.angle_deg,
+            step=cfg.step,
+            start=cfg.start,
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = os.path.join(tmpdir, "out.svg")
+            write_svg(
+                polylines,
+                out_path=out,
+                margin=cfg.margin,
+                precision=cfg.precision,
+                flip_y=cfg.flip_y,
+                width=cfg.width,
+                height=cfg.height,
+                style=cfg.style,
+                background=cfg.background,
+                title=cfg.name,
+            )
+            with open(out) as f:
+                return f.read()
+
+    def test_koch(self):
+        content = self._render_example("koch.json")
+        self.assertIn("<svg", content)
+        self.assertIn("<polyline", content)
+        self.assertIn("viewBox=", content)
+
+    def test_fractal_tree(self):
+        content = self._render_example("fractal_tree.json")
+        self.assertIn("<svg", content)
+        self.assertIn("<polyline", content)
+
+    def test_hilbert_curve(self):
+        content = self._render_example("hilbert_curve.json")
+        self.assertIn("<svg", content)
+        self.assertIn("<polyline", content)
 
 
 if __name__ == "__main__":
