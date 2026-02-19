@@ -3,7 +3,6 @@ import unittest
 import math
 import tempfile
 import os
-import io
 import json
 from lsystem_generator import (
     parse_config,

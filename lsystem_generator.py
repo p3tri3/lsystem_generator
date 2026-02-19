@@ -101,7 +101,7 @@ class SvgStyle:
     stroke_linejoin: str = "round"
 
 
-@dataclass
+@dataclass(frozen=True)
 class RenderConfig:
     name: str
     axiom: str
@@ -185,9 +185,6 @@ class PolylineBuffer:
             if cur[-1] != p:
                 cur.append(p)
 
-
-def _deg_to_rad(deg: float) -> float:
-    return deg * math.pi / 180.0
 
 
 _DefaultAction = Literal["forward_draw", "forward_move", "noop"]
@@ -301,7 +298,7 @@ def interpret_to_polylines(
                 f"forward command for '{sym}' field 'step' must be a number",
             )
             dist = step * float(mult)
-            rad = _deg_to_rad(h)
+            rad = math.radians(h)
             nx = x + dist * math.cos(rad)
             ny = y + dist * math.sin(rad)
 
@@ -329,18 +326,31 @@ def interpret_to_polylines(
 # -------------------------
 
 
+def _ensure_parent_dir(path: str) -> None:
+    os.makedirs(os.path.dirname(os.path.abspath(path)) or ".", exist_ok=True)
+
+
 def compute_bounds(polylines: list[list[Point]]) -> tuple[float, float, float, float]:
     _require(polylines, "No drawable geometry produced.")
-    xs: list[float] = []
-    ys: list[float] = []
+    min_x = min_y = math.inf
+    max_x = max_y = -math.inf
     for pl in polylines:
         for x, y in pl:
-            xs.append(x)
-            ys.append(y)
-    return (min(xs), min(ys), max(xs), max(ys))
+            if x < min_x:
+                min_x = x
+            if x > max_x:
+                max_x = x
+            if y < min_y:
+                min_y = y
+            if y > max_y:
+                max_y = y
+    return (min_x, min_y, max_x, max_y)
 
 
 def _fmt(x: float, precision: int) -> str:
+    # Normalise -0.0 so it never produces "-0" in SVG output.
+    if not x:
+        x = 0.0
     # Strip trailing zeros for nicer SVG.
     s = f"{x:.{precision}f}"
     if "." in s:
@@ -430,7 +440,7 @@ def write_svg(
 
     lines.append("</svg>")
 
-    os.makedirs(os.path.dirname(os.path.abspath(out_path)) or ".", exist_ok=True)
+    _ensure_parent_dir(out_path)
     with open(out_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
         f.write("\n")
@@ -563,6 +573,9 @@ def _random_balanced_word(
             word.append("[")
             depth += 1
             continue
+        # When depth == 0 this branch is always False, so the p_branch * 2
+        # probability mass for ']' falls through to the forward/turn choices
+        # below — intentionally making branching symbols rarer at the root.
         if r < p_branch * 2 and depth > 0:
             word.append("]")
             depth -= 1
@@ -654,11 +667,13 @@ def generate_random_config(seed: int | None = None) -> dict[str, Any]:
         },
     }
 
+    # Internal sanity check: generated config must always parse cleanly.
+    parse_config(cfg)
     return cfg
 
 
 def dump_json(obj: dict, path: str) -> None:
-    os.makedirs(os.path.dirname(os.path.abspath(path)) or ".", exist_ok=True)
+    _ensure_parent_dir(path)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, indent=2, ensure_ascii=False)
         f.write("\n")
