@@ -20,16 +20,18 @@ Run:
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import math
 import os
 import random
 import sys
 from dataclasses import dataclass
-from typing import Dict, Generator, Iterable, List, Optional, Tuple, Union, Any
+from collections.abc import Generator, Iterable
+from typing import Any, Literal
 
-Number = Union[int, float]
-Point = Tuple[float, float]
+Number = int | float
+Point = tuple[float, float]
 
 
 # -------------------------
@@ -68,12 +70,12 @@ def _as_bool(x: Any, path: str) -> bool:
     return x
 
 
-def _as_dict(x: Any, path: str) -> dict:
+def _as_dict(x: Any, path: str) -> dict[str, Any]:
     _require(isinstance(x, dict), f"{path} must be an object")
     return x
 
 
-def _as_list(x: Any, path: str) -> list:
+def _as_list(x: Any, path: str) -> list[Any]:
     _require(isinstance(x, list), f"{path} must be an array")
     return x
 
@@ -104,23 +106,23 @@ class RenderConfig:
     name: str
     axiom: str
     iterations: int
-    rules: Dict[str, str]
+    rules: dict[str, str]
 
     angle_deg: float
     step: float
     start: TurtleState
 
     # command table: symbol -> action dict
-    commands: Dict[str, Dict[str, Any]]
+    commands: dict[str, dict[str, Any]]
 
     # svg
     margin: float
     precision: int
     flip_y: bool
-    width: Optional[float]
-    height: Optional[float]
+    width: float | None
+    height: float | None
     style: SvgStyle
-    background: Optional[str]
+    background: str | None
 
 
 # -------------------------
@@ -129,7 +131,7 @@ class RenderConfig:
 
 
 def stream_expand(
-    axiom: str, rules: Dict[str, str], iterations: int
+    axiom: str, rules: dict[str, str], iterations: int
 ) -> Generator[str, None, None]:
     """Yield expanded symbols in order without building the full string.
 
@@ -138,7 +140,7 @@ def stream_expand(
     _require(iterations >= 0, "iterations must be >= 0")
 
     # Frame: (current_string, index, depth)
-    stack: List[Tuple[str, int, int]] = [(axiom, 0, 0)]
+    stack: list[tuple[str, int, int]] = [(axiom, 0, 0)]
 
     while stack:
         s, i, d = stack.pop()
@@ -166,12 +168,12 @@ def stream_expand(
 
 @dataclass
 class PolylineBuffer:
-    polylines: List[List[Point]]
+    polylines: list[list[Point]]
 
     def start_new(self, p: Point) -> None:
         self.polylines.append([p])
 
-    def current(self) -> List[Point]:
+    def current(self) -> list[Point]:
         assert self.polylines, "current() called before start_new()"
         return self.polylines[-1]
 
@@ -188,15 +190,18 @@ def _deg_to_rad(deg: float) -> float:
     return deg * math.pi / 180.0
 
 
+_DefaultAction = Literal["forward_draw", "forward_move", "noop"]
+
+
 def interpret_to_polylines(
     symbols: Iterable[str],
     *,
-    commands: Dict[str, Dict[str, Any]],
+    commands: dict[str, dict[str, Any]],
     angle_deg: float,
     step: float,
     start: TurtleState,
-    default_action: str = "forward_draw",
-) -> List[List[Point]]:
+    default_action: _DefaultAction = "forward_draw",
+) -> list[list[Point]]:
     """Interpret streamed symbols to polylines.
 
     The command dict supports action types:
@@ -214,6 +219,10 @@ def interpret_to_polylines(
     """
 
     _require(step > 0, "turtle.step must be > 0")
+    _require(
+        default_action in ("forward_draw", "forward_move", "noop"),
+        f"default_action must be 'forward_draw', 'forward_move', or 'noop'; got {default_action!r}",
+    )
 
     x, y, h = start.x, start.y, start.heading_deg
 
@@ -221,7 +230,7 @@ def interpret_to_polylines(
     buf.start_new((x, y))
 
     # stack stores turtle state plus a flag whether we should continue current polyline
-    stack: List[TurtleState] = []
+    stack: list[TurtleState] = []
 
     for sym in symbols:
         action = commands.get(sym)
@@ -264,6 +273,11 @@ def interpret_to_polylines(
             continue
 
         if atype == "push":
+            # Do NOT start a new polyline here.  The branch geometry begins
+            # from the current pen position and is appended to the active
+            # polyline.  A new polyline is started only on `pop` (after
+            # restoring state) to prevent an unwanted connecting stroke from
+            # the branch tip back to the trunk continuation point.
             stack.append(TurtleState(x, y, h))
             continue
 
@@ -303,7 +317,7 @@ def interpret_to_polylines(
         raise ConfigError(f"Unknown command type '{atype}' for symbol '{sym}'")
 
     # Cleanup: remove empty or 1-point polylines
-    out: List[List[Point]] = []
+    out: list[list[Point]] = []
     for pl in buf.polylines:
         if len(pl) >= 2:
             out.append(pl)
@@ -315,10 +329,10 @@ def interpret_to_polylines(
 # -------------------------
 
 
-def compute_bounds(polylines: List[List[Point]]) -> Tuple[float, float, float, float]:
+def compute_bounds(polylines: list[list[Point]]) -> tuple[float, float, float, float]:
     _require(polylines, "No drawable geometry produced.")
-    xs: List[float] = []
-    ys: List[float] = []
+    xs: list[float] = []
+    ys: list[float] = []
     for pl in polylines:
         for x, y in pl:
             xs.append(x)
@@ -335,17 +349,17 @@ def _fmt(x: float, precision: int) -> str:
 
 
 def write_svg(
-    polylines: List[List[Point]],
+    polylines: list[list[Point]],
     *,
     out_path: str,
     margin: float,
     precision: int,
     flip_y: bool,
-    width: Optional[float],
-    height: Optional[float],
+    width: float | None,
+    height: float | None,
     style: SvgStyle,
-    background: Optional[str],
-    title: Optional[str] = None,
+    background: str | None,
+    title: str | None = None,
 ) -> None:
     minx, miny, maxx, maxy = compute_bounds(polylines)
 
@@ -370,7 +384,7 @@ def write_svg(
 
     view_box = f"{_fmt(minx, precision)} {_fmt(miny, precision)} {_fmt(w, precision)} {_fmt(h, precision)}"
 
-    lines: List[str] = []
+    lines: list[str] = []
     lines.append('<?xml version="1.0" encoding="UTF-8"?>')
     lines.append(
         f'<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="{view_box}"{svg_w_attr}{svg_h_attr}>'
@@ -438,7 +452,7 @@ def parse_config(obj: dict) -> RenderConfig:
     _require(iterations >= 0, "iterations must be >= 0")
 
     rules_obj = _as_dict(obj.get("rules", {}), "rules")
-    rules: Dict[str, str] = {}
+    rules: dict[str, str] = {}
     for k, v in rules_obj.items():
         _require(
             isinstance(k, str) and len(k) == 1,
@@ -458,7 +472,7 @@ def parse_config(obj: dict) -> RenderConfig:
     )
 
     commands_obj = _as_dict(turtle.get("commands", {}), "turtle.commands")
-    commands: Dict[str, Dict[str, Any]] = {}
+    commands: dict[str, dict[str, Any]] = {}
     for sym, action in commands_obj.items():
         _require(
             isinstance(sym, str) and len(sym) == 1,
@@ -540,7 +554,7 @@ def _random_balanced_word(
     Produces symbols from: F, +, -, [, ]
     Ensures brackets are balanced and never go negative.
     """
-    word: List[str] = []
+    word: list[str] = []
     depth = 0
 
     for _ in range(length):
@@ -573,7 +587,7 @@ def _random_balanced_word(
     return "".join(word)
 
 
-def generate_random_config(seed: Optional[int] = None) -> dict:
+def generate_random_config(seed: int | None = None) -> dict[str, Any]:
     rng = random.Random(seed)
 
     angle = rng.choice([15, 20, 22.5, 25, 30, 36, 45, 60, 90])
@@ -868,12 +882,13 @@ def cmd_render(config_path: str, output_path: str, default_action: str) -> None:
     )
 
 
+_VALIDATE_SYMBOL_LIMIT = 10_000
+
+
 def cmd_validate(config_path: str) -> None:
     cfg_obj = load_json(config_path)
     cfg = parse_config(cfg_obj)
 
-    # Count a rough estimate of output size by sampling the stream; we will not exhaust it.
-    # But we can at least show some basics.
     print(f"name: {cfg.name}")
     print(f"axiom length: {len(cfg.axiom)}")
     print(f"iterations: {cfg.iterations}")
@@ -884,13 +899,37 @@ def cmd_validate(config_path: str) -> None:
     print(f"commands: {len(cfg.commands)}")
     print(f"svg: margin={cfg.margin} precision={cfg.precision} flip_y={cfg.flip_y}")
 
+    # Run a bounded expansion + interpretation to catch render-time failures
+    # (e.g. no drawable geometry, bad command definitions, exponential blow-up).
+    raw = stream_expand(cfg.axiom, cfg.rules, cfg.iterations)
+    bounded = list(itertools.islice(raw, _VALIDATE_SYMBOL_LIMIT))
+    truncated = len(bounded) == _VALIDATE_SYMBOL_LIMIT
+    polylines = interpret_to_polylines(
+        bounded,
+        commands=cfg.commands,
+        angle_deg=cfg.angle_deg,
+        step=cfg.step,
+        start=cfg.start,
+        default_action="forward_draw",
+    )
+    sym_label = f"{len(bounded)}+" if truncated else str(len(bounded))
+    print(f"symbols (sampled): {sym_label}")
+    print(f"polylines: {len(polylines)}")
+    if truncated:
+        print(
+            f"warning: expansion exceeds {_VALIDATE_SYMBOL_LIMIT} symbols; "
+            "geometry stats are based on the first portion only"
+        )
+    if not polylines:
+        raise ConfigError("Config produces no drawable geometry")
 
-def cmd_random(output_path: str, seed: Optional[int]) -> None:
+
+def cmd_random(output_path: str, seed: int | None) -> None:
     cfg = generate_random_config(seed)
     dump_json(cfg, output_path)
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = build_argparser()
     args = ap.parse_args(argv)
 
@@ -906,7 +945,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     except ConfigError as e:
         print(f"Config error: {e}", file=sys.stderr)
         return 2
-    except FileNotFoundError as e:
+    except OSError as e:
         print(f"File error: {e}", file=sys.stderr)
         return 2
     return 0
