@@ -28,7 +28,6 @@ import sys
 from dataclasses import dataclass
 from typing import Dict, Generator, Iterable, List, Optional, Tuple, Union, Any
 
-
 Number = Union[int, float]
 Point = Tuple[float, float]
 
@@ -36,6 +35,7 @@ Point = Tuple[float, float]
 # -------------------------
 # Errors / Validation
 # -------------------------
+
 
 class ConfigError(ValueError):
     pass
@@ -52,7 +52,9 @@ def _as_float(x: Any, path: str) -> float:
 
 
 def _as_int(x: Any, path: str) -> int:
-    _require(isinstance(x, int) and not isinstance(x, bool), f"{path} must be an integer")
+    _require(
+        isinstance(x, int) and not isinstance(x, bool), f"{path} must be an integer"
+    )
     return int(x)
 
 
@@ -79,6 +81,7 @@ def _as_list(x: Any, path: str) -> list:
 # -------------------------
 # Command model
 # -------------------------
+
 
 @dataclass(frozen=True)
 class TurtleState:
@@ -124,7 +127,10 @@ class RenderConfig:
 # Streaming expansion
 # -------------------------
 
-def stream_expand(axiom: str, rules: Dict[str, str], iterations: int) -> Generator[str, None, None]:
+
+def stream_expand(
+    axiom: str, rules: Dict[str, str], iterations: int
+) -> Generator[str, None, None]:
     """Yield expanded symbols in order without building the full string.
 
     Uses an explicit stack of (string, index, depth) frames.
@@ -145,7 +151,9 @@ def stream_expand(axiom: str, rules: Dict[str, str], iterations: int) -> Generat
 
         if d < iterations and ch in rules:
             repl = rules[ch]
-            # Start new frame for replacement
+            # Push replacement AFTER continuation so it sits on top of the
+            # stack and is popped first.  This preserves left-to-right symbol
+            # order: continuation waits while replacement is fully traversed.
             stack.append((repl, 0, d + 1))
         else:
             yield ch
@@ -155,6 +163,7 @@ def stream_expand(axiom: str, rules: Dict[str, str], iterations: int) -> Generat
 # Turtle interpreter
 # -------------------------
 
+
 @dataclass
 class PolylineBuffer:
     polylines: List[List[Point]]
@@ -163,8 +172,7 @@ class PolylineBuffer:
         self.polylines.append([p])
 
     def current(self) -> List[Point]:
-        if not self.polylines:
-            self.polylines.append([])
+        assert self.polylines, "current() called before start_new()"
         return self.polylines[-1]
 
     def add_point(self, p: Point) -> None:
@@ -226,21 +234,28 @@ def interpret_to_polylines(
                 action = {"type": "noop"}
 
         atype = action.get("type")
-        _require(isinstance(atype, str), f"command for '{sym}' must have string field 'type'")
+        _require(
+            isinstance(atype, str), f"command for '{sym}' must have string field 'type'"
+        )
 
         if atype == "noop":
             continue
 
         if atype == "turn":
             direction = action.get("direction")
-            _require(direction in (-1, 1), f"turn command for '{sym}' must have direction -1 or 1")
+            _require(
+                direction in (-1, 1),
+                f"turn command for '{sym}' must have direction -1 or 1",
+            )
             a = action.get("angle", 1)
             if isinstance(a, (int, float)):
                 # If a looks like a multiplier (default 1) we multiply by base angle.
                 # If user wants an absolute number of degrees, they can use turn_abs.
                 h += float(direction) * float(a) * float(angle_deg)
             else:
-                raise ConfigError(f"turn command for '{sym}' field 'angle' must be a number")
+                raise ConfigError(
+                    f"turn command for '{sym}' field 'angle' must be a number"
+                )
             continue
 
         if atype == "turn_abs":
@@ -262,9 +277,15 @@ def interpret_to_polylines(
 
         if atype == "forward":
             draw = action.get("draw")
-            _require(isinstance(draw, bool), f"forward command for '{sym}' must have boolean field 'draw'")
+            _require(
+                isinstance(draw, bool),
+                f"forward command for '{sym}' must have boolean field 'draw'",
+            )
             mult = action.get("step", 1)
-            _require(isinstance(mult, (int, float)), f"forward command for '{sym}' field 'step' must be a number")
+            _require(
+                isinstance(mult, (int, float)),
+                f"forward command for '{sym}' field 'step' must be a number",
+            )
             dist = step * float(mult)
             rad = _deg_to_rad(h)
             nx = x + dist * math.cos(rad)
@@ -328,17 +349,20 @@ def write_svg(
 ) -> None:
     minx, miny, maxx, maxy = compute_bounds(polylines)
 
-    w = maxx - minx
-    h = maxy - miny
-    _require(w > 0 and h > 0, "Degenerate bounds (width/height zero).")
-
-    # Add margin in user units.
+    # Add margin in user units before checking dimensions so that valid
+    # collinear geometry (e.g. a single horizontal line where h==0) can be
+    # rescued by a nonzero margin.
     minx -= margin
     miny -= margin
     maxx += margin
     maxy += margin
     w = maxx - minx
     h = maxy - miny
+    _require(
+        w > 0 and h > 0,
+        "Degenerate bounds after margin (width or height is zero). "
+        "Set svg.margin > 0 to render collinear or single-point geometry.",
+    )
 
     # If width/height are specified, we keep viewBox but set explicit size.
     svg_w_attr = f' width="{_fmt(float(width), precision)}"' if width else ""
@@ -354,21 +378,23 @@ def write_svg(
 
     if title:
         # Keep it short; SVG title is helpful in editors.
-        safe_title = title.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        safe_title = (
+            title.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        )
         lines.append(f"  <title>{safe_title}</title>")
 
     if background and background.lower() != "none":
         # Background rect in viewBox coordinates.
         lines.append(
-            f"  <rect x=\"{_fmt(minx, precision)}\" y=\"{_fmt(miny, precision)}\" "
-            f"width=\"{_fmt(w, precision)}\" height=\"{_fmt(h, precision)}\" "
-            f"fill=\"{background}\" />"
+            f'  <rect x="{_fmt(minx, precision)}" y="{_fmt(miny, precision)}" '
+            f'width="{_fmt(w, precision)}" height="{_fmt(h, precision)}" '
+            f'fill="{background}" />'
         )
 
     style_attr = (
-        f"stroke=\"{style.stroke}\" stroke-width=\"{_fmt(style.stroke_width, precision)}\" "
-        f"fill=\"{style.fill}\" stroke-linecap=\"{style.stroke_linecap}\" "
-        f"stroke-linejoin=\"{style.stroke_linejoin}\""
+        f'stroke="{style.stroke}" stroke-width="{_fmt(style.stroke_width, precision)}" '
+        f'fill="{style.fill}" stroke-linecap="{style.stroke_linecap}" '
+        f'stroke-linejoin="{style.stroke_linejoin}"'
     )
 
     if flip_y:
@@ -376,14 +402,14 @@ def write_svg(
         # Since viewBox is in absolute coordinates, we flip about y = (miny + maxy).
         # That is: translate(0, miny+maxy) scale(1,-1)
         flip_y_line = _fmt(miny + maxy, precision)
-        lines.append(f"  <g transform=\"translate(0,{flip_y_line}) scale(1,-1)\">")
+        lines.append(f'  <g transform="translate(0,{flip_y_line}) scale(1,-1)">')
         indent = "    "
     else:
         indent = "  "
 
     for pl in polylines:
         pts = " ".join(f"{_fmt(x, precision)},{_fmt(y, precision)}" for x, y in pl)
-        lines.append(f"{indent}<polyline points=\"{pts}\" {style_attr} />")
+        lines.append(f'{indent}<polyline points="{pts}" {style_attr} />')
 
     if flip_y:
         lines.append("  </g>")
@@ -414,7 +440,10 @@ def parse_config(obj: dict) -> RenderConfig:
     rules_obj = _as_dict(obj.get("rules", {}), "rules")
     rules: Dict[str, str] = {}
     for k, v in rules_obj.items():
-        _require(isinstance(k, str) and len(k) == 1, "rules keys must be single-character strings")
+        _require(
+            isinstance(k, str) and len(k) == 1,
+            "rules keys must be single-character strings",
+        )
         rules[k] = _as_str(v, f"rules['{k}']")
 
     turtle = _as_dict(obj.get("turtle", {}), "turtle")
@@ -431,7 +460,10 @@ def parse_config(obj: dict) -> RenderConfig:
     commands_obj = _as_dict(turtle.get("commands", {}), "turtle.commands")
     commands: Dict[str, Dict[str, Any]] = {}
     for sym, action in commands_obj.items():
-        _require(isinstance(sym, str) and len(sym) == 1, "turtle.commands keys must be single-character strings")
+        _require(
+            isinstance(sym, str) and len(sym) == 1,
+            "turtle.commands keys must be single-character strings",
+        )
         commands[sym] = _as_dict(action, f"turtle.commands['{sym}']")
 
     svg = _as_dict(obj.get("svg", {}), "svg")
@@ -452,10 +484,16 @@ def parse_config(obj: dict) -> RenderConfig:
     style_obj = _as_dict(svg.get("style", {}), "svg.style")
     style = SvgStyle(
         stroke=_as_str(style_obj.get("stroke", "#000"), "svg.style.stroke"),
-        stroke_width=_as_float(style_obj.get("stroke_width", 1.0), "svg.style.stroke_width"),
+        stroke_width=_as_float(
+            style_obj.get("stroke_width", 1.0), "svg.style.stroke_width"
+        ),
         fill=_as_str(style_obj.get("fill", "none"), "svg.style.fill"),
-        stroke_linecap=_as_str(style_obj.get("stroke_linecap", "round"), "svg.style.stroke_linecap"),
-        stroke_linejoin=_as_str(style_obj.get("stroke_linejoin", "round"), "svg.style.stroke_linejoin"),
+        stroke_linecap=_as_str(
+            style_obj.get("stroke_linecap", "round"), "svg.style.stroke_linecap"
+        ),
+        stroke_linejoin=_as_str(
+            style_obj.get("stroke_linejoin", "round"), "svg.style.stroke_linejoin"
+        ),
     )
 
     background = svg.get("background")
@@ -494,7 +532,9 @@ def load_json(path: str) -> dict:
 # -------------------------
 
 
-def _random_balanced_word(rng: random.Random, length: int, *, p_branch: float = 0.20) -> str:
+def _random_balanced_word(
+    rng: random.Random, length: int, *, p_branch: float = 0.20
+) -> str:
     """Generate a random L-system replacement word with balanced brackets.
 
     Produces symbols from: F, +, -, [, ]
@@ -788,7 +828,9 @@ def build_argparser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     pg.add_argument("output", help="Where to write the generated JSON file.")
-    pg.add_argument("--seed", type=int, default=None, help="Seed for repeatable randomness.")
+    pg.add_argument(
+        "--seed", type=int, default=None, help="Seed for repeatable randomness."
+    )
 
     return p
 
@@ -836,7 +878,9 @@ def cmd_validate(config_path: str) -> None:
     print(f"axiom length: {len(cfg.axiom)}")
     print(f"iterations: {cfg.iterations}")
     print(f"rules: {len(cfg.rules)}")
-    print(f"turtle: angle={cfg.angle_deg} step={cfg.step} start=({cfg.start.x},{cfg.start.y},{cfg.start.heading_deg}deg)")
+    print(
+        f"turtle: angle={cfg.angle_deg} step={cfg.step} start=({cfg.start.x},{cfg.start.y},{cfg.start.heading_deg}deg)"
+    )
     print(f"commands: {len(cfg.commands)}")
     print(f"svg: margin={cfg.margin} precision={cfg.precision} flip_y={cfg.flip_y}")
 
