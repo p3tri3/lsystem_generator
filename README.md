@@ -1,5 +1,13 @@
 # Streaming L-system to SVG
 
+![CI](https://github.com/p3tri3/lsystem_generator/actions/workflows/ci.yml/badge.svg?branch=main)
+[![codecov](https://codecov.io/gh/p3tri3/lsystem_generator/graph/badge.svg)](https://codecov.io/gh/p3tri3/lsystem_generator)
+![CodeQL](https://github.com/p3tri3/lsystem_generator/actions/workflows/codeql.yml/badge.svg?branch=main)
+![Ruff](https://github.com/p3tri3/lsystem_generator/actions/workflows/ruff.yml/badge.svg?branch=main)
+![Mypy](https://github.com/p3tri3/lsystem_generator/actions/workflows/mypy.yml/badge.svg?branch=main)
+![Black](https://github.com/p3tri3/lsystem_generator/actions/workflows/black.yml/badge.svg?branch=main)
+
+
 `lsystem_generator` is a Python program that **interprets L-systems** (Lindenmayer systems) and writes the drawing as an **SVG file** (using polylines), intended to be opened in vector editors (Inkscape, Illustrator, Affinity Designer, etc.) for further refinement.
 
 This renderer supports **streaming expansion**: it does **not** need to build the fully-expanded L-system string in memory.
@@ -31,7 +39,13 @@ This renderer supports **streaming expansion**: it does **not** need to build th
 This is a single-file script.
 
 - Requires Python **3.11+**
-- No third-party dependencies.
+- No runtime third-party dependencies.
+
+For development (lint/type/format/test), install tooling with:
+
+```bash
+python -m pip install -r requirements-dev.txt
+```
 
 ---
 
@@ -40,7 +54,15 @@ This is a single-file script.
 To run the test suite:
 
 ```bash
-python -m unittest test_lsystem_generator.py
+pytest
+```
+
+Static checks:
+
+```bash
+ruff check .
+black --check .
+mypy .
 ```
 
 ---

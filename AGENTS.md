@@ -14,10 +14,13 @@ General-purpose **L-system (Lindenmayer system) generator** that renders **clean
 ## Quick commands
 
 ```bash
-python -m unittest test_lsystem_generator.py
+pytest
 python lsystem_generator.py validate <config.json>
 python lsystem_generator.py render <config.json> <output.svg>
 python lsystem_generator.py random <output.json> --seed 123
+ruff check .
+black --check .
+mypy .
 ```
 
 ## Conceptual model (do not collapse layers)

@@ -16,10 +16,13 @@ Treat **AGENTS.md as the source of truth** for architecture, invariants, and val
 ## Handy commands
 
 ```bash
-python -m unittest test_lsystem_generator.py
+pytest
 python lsystem_generator.py validate <config.json>
 python lsystem_generator.py render <config.json> <output.svg>
 python lsystem_generator.py random <output.json> [--seed N]
+ruff check .
+black --check .
+mypy .
 ```
 
 ## Key constraints

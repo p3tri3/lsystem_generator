@@ -248,7 +248,9 @@ def interpret_to_polylines(
                 f"turn command for '{sym}' must have direction -1 or 1",
             )
             if not isinstance(direction, int):
-                raise TypeError(f"Expected int direction, got {type(direction).__name__}")
+                raise TypeError(
+                    f"Expected int direction, got {type(direction).__name__}"
+                )
             a = action.get("angle", 1)
             if isinstance(a, (int, float)):
                 # If a looks like a multiplier (default 1) we multiply by base angle.

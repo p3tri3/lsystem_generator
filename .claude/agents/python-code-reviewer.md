@@ -24,7 +24,34 @@ Before forming your review conclusions, you **must** run the following tools and
    - Report all type errors under strict mode.
    - Flag missing annotations, incorrect types, and unsafe casts.
 
-Run all three tools and collate their output before writing your review. If a tool is unavailable or fails to run, note this explicitly and continue with the remaining checks.
+3. **Security Scanning** — `bandit -r lsystem_generator.py`
+   - Run on the production file only, **not** on `test_lsystem_generator.py`.
+   - Known false positives to skip without comment:
+     - **B101** in any test file (pytest requires bare `assert`; never run bandit on tests).
+     - **B311** (`random.Random`) when used for reproducible seed-based generation, not cryptography.
+   - Genuine findings to escalate: `assert` in production code (B101), shell injection (B602/B603), unsafe deserialization.
+
+4. **Dead Code Detection** — `vulture lsystem_generator.py`
+   - Report all findings at any confidence level.
+   - **Do not treat findings as automatic removals.** Each must be verified manually:
+     - Could the symbol be part of a public API consumed by external importers?
+     - Is it intentionally kept for future use and documented as such?
+   - Only escalate findings that are confirmed dead after verification.
+
+5. **Cyclomatic Complexity** — `radon cc . -s -a`
+   - Report all functions rated **C (CC ≥ 11) or above**. Lower-rated functions need not appear in the review unless they are in the diff.
+   - Known standing hotspots (inherent complexity, not code smells):
+     - `interpret_to_polylines` — C (16): dispatches 7+ turtle command types; complexity is structural.
+     - `write_svg` — C (11): SVG coordinate/transform layout logic.
+   - **Diff-scoped action**: if a changed function is rated C or above, apply extra scrutiny to branching logic and ensure tests cover distinct paths. CC is the theoretical minimum number of test cases for branch coverage.
+   - **Regression action**: if a function that was previously A or B appears to have crossed into C based on the changes introduced (new branches, nested conditions), flag it as a ⚠️ Warning.
+
+6. **Maintainability Index** — `radon mi . -s`
+   - Report the grade and score for each file.
+   - Grading scale: **A (20–100)** healthy · **B (10–19)** degraded · **C (0–9)** critical.
+   - Current baseline: both files are grade A (≈29.6). Only escalate if any file drops to grade B or below — report it as a ⚠️ Warning. A stable A grade needs no comment.
+
+Run all six tools and collate their output before writing your review. If a tool is unavailable or fails to run, note this explicitly and continue with the remaining checks.
 
 ## Review Dimensions
 
@@ -86,6 +113,18 @@ Structure your review as follows:
 
 **mypy --strict .**
 <output or "No type errors found.">
+
+**bandit -r lsystem_generator.py**
+<output or "No security issues found.">
+
+**vulture lsystem_generator.py**
+<output or "No dead code found.">
+
+**radon cc . -s -a**
+<C-or-above functions only, or "All functions rated A or B.">
+
+**radon mi . -s**
+<output — flag only if any file drops below grade B>
 
 ---
 ### 🚨 Blockers
