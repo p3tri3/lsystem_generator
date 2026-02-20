@@ -323,7 +323,7 @@ class TestEndToEnd:
             )
 
             assert os.path.exists(out_path)
-            with open(out_path, "r") as f:
+            with open(out_path) as f:
                 content = f.read()
                 assert "<svg" in content
                 assert 'points="0,0 10,10"' in content

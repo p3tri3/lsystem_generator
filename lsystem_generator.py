@@ -26,8 +26,8 @@ import math
 import os
 import random
 import sys
-from dataclasses import dataclass
 from collections.abc import Generator, Iterable
+from dataclasses import dataclass
 from typing import Any, Literal, cast
 
 Point = tuple[float, float]
@@ -197,7 +197,7 @@ def interpret_to_polylines(
 
     The command dict supports action types:
       - {"type":"forward", "draw": true|false, "step": <optional multiplier>}
-      - {"type":"turn", "direction": +1|-1, "angle": <optional multiplier or absolute deg>}
+      - {"type":"turn", "direction": +1|-1, "angle": <optional multiplier or abs deg>}
       - {"type":"turn_abs", "angle": <degrees>}
       - {"type":"push"}
       - {"type":"pop"}
@@ -212,7 +212,10 @@ def interpret_to_polylines(
     _require(step > 0, "turtle.step must be > 0")
     _require(
         default_action in ("forward_draw", "forward_move", "noop"),
-        f"default_action must be 'forward_draw', 'forward_move', or 'noop'; got {default_action!r}",
+        (
+            "default_action must be 'forward_draw', 'forward_move', or 'noop'; got "
+            f"{default_action!r}"
+        ),
     )
 
     x, y, h = start.x, start.y, start.heading_deg
@@ -280,7 +283,8 @@ def interpret_to_polylines(
             _require(bool(stack), f"pop command '{sym}' encountered with empty stack")
             st = stack.pop()
             x, y, h = st.x, st.y, st.heading_deg
-            # Start a new polyline at the restored point to prevent unwanted connecting strokes.
+            # Start a new polyline at the restored point to prevent unwanted
+            # connecting strokes.
             buf.start_new((x, y))
             continue
 
@@ -390,12 +394,16 @@ def write_svg(
     svg_w_attr = f' width="{_fmt(float(width), precision)}"' if width else ""
     svg_h_attr = f' height="{_fmt(float(height), precision)}"' if height else ""
 
-    view_box = f"{_fmt(minx, precision)} {_fmt(miny, precision)} {_fmt(w, precision)} {_fmt(h, precision)}"
+    view_box = (
+        f"{_fmt(minx, precision)} {_fmt(miny, precision)} {_fmt(w, precision)} "
+        f"{_fmt(h, precision)}"
+    )
 
     lines: list[str] = []
     lines.append('<?xml version="1.0" encoding="UTF-8"?>')
     lines.append(
-        f'<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="{view_box}"{svg_w_attr}{svg_h_attr}>'
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" "
+        f"viewBox=\"{view_box}\"{svg_w_attr}{svg_h_attr}>"
     )
 
     if title:
@@ -420,7 +428,8 @@ def write_svg(
     )
 
     if flip_y:
-        # Flip around the center line: easiest is to apply a transform that scales y by -1.
+        # Flip around the center line: easiest is to apply a transform that scales y
+        # by -1.
         # Since viewBox is in absolute coordinates, we flip about y = (miny + maxy).
         # That is: translate(0, miny+maxy) scale(1,-1)
         flip_y_line = _fmt(miny + maxy, precision)
@@ -542,11 +551,11 @@ def parse_config(obj: dict[str, Any]) -> RenderConfig:
 
 
 def load_json(path: str) -> dict[str, Any]:
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         try:
             return cast(dict[str, Any], json.load(f))
         except json.JSONDecodeError as e:
-            raise ConfigError(f"Invalid JSON in {path}: {e}")
+            raise ConfigError(f"Invalid JSON in {path}: {e}") from e
 
 
 # -------------------------
@@ -909,7 +918,9 @@ def cmd_validate(config_path: str) -> None:
     print(f"iterations: {cfg.iterations}")
     print(f"rules: {len(cfg.rules)}")
     print(
-        f"turtle: angle={cfg.angle_deg} step={cfg.step} start=({cfg.start.x},{cfg.start.y},{cfg.start.heading_deg}deg)"
+        "turtle: "
+        f"angle={cfg.angle_deg} step={cfg.step} "
+        f"start=({cfg.start.x},{cfg.start.y},{cfg.start.heading_deg}deg)"
     )
     print(f"commands: {len(cfg.commands)}")
     print(f"svg: margin={cfg.margin} precision={cfg.precision} flip_y={cfg.flip_y}")
