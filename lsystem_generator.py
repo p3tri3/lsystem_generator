@@ -402,8 +402,8 @@ def write_svg(
     lines: list[str] = []
     lines.append('<?xml version="1.0" encoding="UTF-8"?>')
     lines.append(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" "
-        f"viewBox=\"{view_box}\"{svg_w_attr}{svg_h_attr}>"
+        '<svg xmlns="http://www.w3.org/2000/svg" version="1.1" '
+        f'viewBox="{view_box}"{svg_w_attr}{svg_h_attr}>'
     )
 
     if title:
