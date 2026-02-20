@@ -28,9 +28,8 @@ import random
 import sys
 from dataclasses import dataclass
 from collections.abc import Generator, Iterable
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
-Number = int | float
 Point = tuple[float, float]
 
 
@@ -62,22 +61,17 @@ def _as_int(x: Any, path: str) -> int:
 
 def _as_str(x: Any, path: str) -> str:
     _require(isinstance(x, str), f"{path} must be a string")
-    return x
+    return cast(str, x)
 
 
 def _as_bool(x: Any, path: str) -> bool:
     _require(isinstance(x, bool), f"{path} must be a boolean")
-    return x
+    return cast(bool, x)
 
 
 def _as_dict(x: Any, path: str) -> dict[str, Any]:
     _require(isinstance(x, dict), f"{path} must be an object")
-    return x
-
-
-def _as_list(x: Any, path: str) -> list[Any]:
-    _require(isinstance(x, list), f"{path} must be an array")
-    return x
+    return cast(dict[str, Any], x)
 
 
 # -------------------------
@@ -174,7 +168,8 @@ class PolylineBuffer:
         self.polylines.append([p])
 
     def current(self) -> list[Point]:
-        assert self.polylines, "current() called before start_new()"
+        if not self.polylines:
+            raise RuntimeError("current() called before start_new()")
         return self.polylines[-1]
 
     def add_point(self, p: Point) -> None:
@@ -184,7 +179,6 @@ class PolylineBuffer:
         else:
             if cur[-1] != p:
                 cur.append(p)
-
 
 
 _DefaultAction = Literal["forward_draw", "forward_move", "noop"]
@@ -253,11 +247,13 @@ def interpret_to_polylines(
                 direction in (-1, 1),
                 f"turn command for '{sym}' must have direction -1 or 1",
             )
+            if not isinstance(direction, int):
+                raise TypeError(f"Expected int direction, got {type(direction).__name__}")
             a = action.get("angle", 1)
             if isinstance(a, (int, float)):
                 # If a looks like a multiplier (default 1) we multiply by base angle.
                 # If user wants an absolute number of degrees, they can use turn_abs.
-                h += float(direction) * float(a) * float(angle_deg)
+                h += direction * float(a) * angle_deg
             else:
                 raise ConfigError(
                     f"turn command for '{sym}' field 'angle' must be a number"
@@ -331,7 +327,7 @@ def _ensure_parent_dir(path: str) -> None:
 
 
 def compute_bounds(polylines: list[list[Point]]) -> tuple[float, float, float, float]:
-    _require(polylines, "No drawable geometry produced.")
+    _require(len(polylines) > 0, "No drawable geometry produced.")
     min_x = min_y = math.inf
     max_x = max_y = -math.inf
     for pl in polylines:
@@ -451,7 +447,7 @@ def write_svg(
 # -------------------------
 
 
-def parse_config(obj: dict) -> RenderConfig:
+def parse_config(obj: dict[str, Any]) -> RenderConfig:
     obj = _as_dict(obj, "root")
 
     name = _as_str(obj.get("name", "L-System"), "name")
@@ -543,10 +539,10 @@ def parse_config(obj: dict) -> RenderConfig:
     )
 
 
-def load_json(path: str) -> dict:
+def load_json(path: str) -> dict[str, Any]:
     with open(path, "r", encoding="utf-8") as f:
         try:
-            return json.load(f)
+            return cast(dict[str, Any], json.load(f))
         except json.JSONDecodeError as e:
             raise ConfigError(f"Invalid JSON in {path}: {e}")
 
@@ -672,7 +668,7 @@ def generate_random_config(seed: int | None = None) -> dict[str, Any]:
     return cfg
 
 
-def dump_json(obj: dict, path: str) -> None:
+def dump_json(obj: dict[str, Any], path: str) -> None:
     _ensure_parent_dir(path)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, indent=2, ensure_ascii=False)
@@ -869,7 +865,9 @@ def build_argparser() -> argparse.ArgumentParser:
 # -------------------------
 
 
-def cmd_render(config_path: str, output_path: str, default_action: str) -> None:
+def cmd_render(
+    config_path: str, output_path: str, default_action: _DefaultAction
+) -> None:
     cfg_obj = load_json(config_path)
     cfg = parse_config(cfg_obj)
 
@@ -950,7 +948,9 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.cmd == "render":
-            cmd_render(args.config, args.output, args.default_action)
+            cmd_render(
+                args.config, args.output, cast(_DefaultAction, args.default_action)
+            )
         elif args.cmd == "validate":
             cmd_validate(args.config)
         elif args.cmd == "random":
