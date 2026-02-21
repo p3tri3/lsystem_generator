@@ -24,10 +24,14 @@ fail_under = 80
 [tool.coverage.xml]
 output = "coverage.xml"
 
-[tool.black]
-line-length = 88
-target-version = ["py311"]
-include = "\\.py$"
+[project]
+name = "lsystem_generator"
+version = "0.1.0"
+description = "Streaming L-system renderer that writes SVG output"
+requires-python = ">=3.11"
+authors = [{ name = "p3tri3" }]
+license = { text = "MIT" }
+readme = "README.md"
 
 [tool.ruff]
 target-version = "py311"

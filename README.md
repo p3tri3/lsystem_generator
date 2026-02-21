@@ -3,9 +3,6 @@
 ![CI](https://github.com/p3tri3/lsystem_generator/actions/workflows/ci.yml/badge.svg?branch=main)
 [![codecov](https://codecov.io/gh/p3tri3/lsystem_generator/graph/badge.svg)](https://codecov.io/gh/p3tri3/lsystem_generator)
 ![CodeQL](https://github.com/p3tri3/lsystem_generator/actions/workflows/codeql.yml/badge.svg?branch=main)
-![Ruff](https://github.com/p3tri3/lsystem_generator/actions/workflows/ruff.yml/badge.svg?branch=main)
-![Mypy](https://github.com/p3tri3/lsystem_generator/actions/workflows/mypy.yml/badge.svg?branch=main)
-![Black](https://github.com/p3tri3/lsystem_generator/actions/workflows/black.yml/badge.svg?branch=main)
 
 
 `lsystem_generator` is a Python program that **interprets L-systems** (Lindenmayer systems) and writes the drawing as an **SVG file** (using polylines), intended to be opened in vector editors (Inkscape, Illustrator, Affinity Designer, etc.) for further refinement.
@@ -61,8 +58,20 @@ Static checks:
 
 ```bash
 ruff check .
-black --check .
+ruff check . --fix   # auto-applies safe fixes
 mypy .
+```
+
+---
+
+## Developer setup
+
+Tool configuration lives in `pyproject.toml`. Dev dependencies are in `requirements-dev.txt`.
+
+Install pre-commit hooks to run linting and type-checking automatically before each commit:
+
+```bash
+pre-commit install
 ```
 
 ---
